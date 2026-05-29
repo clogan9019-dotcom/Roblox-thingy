@@ -1,79 +1,72 @@
--- Create the main frame
-local flyGui = Instance.new("ScreenGui")
-flyGui.Name = "FlyGUI"
-flyGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+-- Simple Fly Script
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local humanoid = char:WaitForChild("Humanoid")
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 150, 0, 50)
-mainFrame.Position = UDim2.new(0.5, -75, 0.95, -25)
-mainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-mainFrame.BorderSizePixel = 2
-mainFrame.BorderColor3 = Color3.new(1, 1, 1)
-mainFrame.Parent = flyGui
+local flying = true
+local speed = 50
 
--- Create the toggle button
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(1, 0, 1, 0)
-toggleButton.Text = "Toggle Fly"
-toggleButton.BackgroundColor3 = Color3.new(0.5, 0.5, 0.5)
-toggleButton.BorderSizePixel = 0
-toggleButton.Parent = mainFrame
+local bv = Instance.new("BodyVelocity")
+bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+bv.Velocity = Vector3.zero
+bv.Parent = hrp
 
--- Variable to track fly state
-local flying = false
-local flyVelocity = Instance.new("BodyVelocity")
+local bg = Instance.new("BodyGyro")
+bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+bg.CFrame = hrp.CFrame
+bg.Parent = hrp
 
--- Function to toggle flying
-local function toggleFly()
-    if flying then
-        flying = false
-        toggleButton.Text = "Toggle Fly"
-        
-        -- Disable flying
-        game.Players.LocalPlayer.Character.HumanoidRootPart.Anchored = false
-        local bodyVelocity = game.Players.LocalPlayer.Character:FindFirstChild("BodyVelocity")
-        if bodyVelocity then
-            bodyVelocity:Destroy()
-        end
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local camera = workspace.CurrentCamera
+
+local controls = {
+    W = false,
+    A = false,
+    S = false,
+    D = false,
+    Space = false,
+    Shift = false
+}
+
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+
+    if input.KeyCode == Enum.KeyCode.W then controls.W = true end
+    if input.KeyCode == Enum.KeyCode.A then controls.A = true end
+    if input.KeyCode == Enum.KeyCode.S then controls.S = true end
+    if input.KeyCode == Enum.KeyCode.D then controls.D = true end
+    if input.KeyCode == Enum.KeyCode.Space then controls.Space = true end
+    if input.KeyCode == Enum.KeyCode.LeftShift then controls.Shift = true end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.W then controls.W = false end
+    if input.KeyCode == Enum.KeyCode.A then controls.A = false end
+    if input.KeyCode == Enum.KeyCode.S then controls.S = false end
+    if input.KeyCode == Enum.KeyCode.D then controls.D = false end
+    if input.KeyCode == Enum.KeyCode.Space then controls.Space = false end
+    if input.KeyCode == Enum.KeyCode.LeftShift then controls.Shift = false end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not flying then return end
+
+    local moveDir = Vector3.zero
+
+    if controls.W then moveDir += camera.CFrame.LookVector end
+    if controls.S then moveDir -= camera.CFrame.LookVector end
+    if controls.A then moveDir -= camera.CFrame.RightVector end
+    if controls.D then moveDir += camera.CFrame.RightVector end
+    if controls.Space then moveDir += Vector3.new(0,1,0) end
+    if controls.Shift then moveDir -= Vector3.new(0,1,0) end
+
+    if moveDir.Magnitude > 0 then
+        bv.Velocity = moveDir.Unit * speed
     else
-        flying = true
-        toggleButton.Text = "Flying Enabled"
-        
-        -- Enable flying
-        flyVelocity.MaxForce = Vector3.new(1000, 1000, 1000)
-        flyVelocity.Velocity = Vector3.new(0, 50, 0)
-        flyVelocity.Parent = game.Players.LocalPlayer.Character.HumanoidRootPart
-        game.Players.LocalPlayer.Character.HumanoidRootPart.Anchored = true
-        
-        -- Connect input to adjust velocity
-        local inputBeganFunc, inputEndedFunc
-
-        inputBeganFunc = function(inputObject)
-            if flying then
-                if inputObject.KeyCode == Enum.KeyCode.W then
-                    flyVelocity.Velocity = Vector3.new(0, 50, -100)
-                elseif inputObject.KeyCode == Enum.KeyCode.S then
-                    flyVelocity.Velocity = Vector3.new(0, 50, 100)
-                elseif inputObject.KeyCode == Enum.KeyCode.A then
-                    flyVelocity.Velocity = Vector3.new(-100, 50, 0)
-                elseif inputObject.KeyCode == Enum.KeyCode.D then
-                    flyVelocity.Velocity = Vector3.new(100, 50, 0)
-                end
-            end
-        end
-
-        inputEndedFunc = function(inputObject)
-            if flying then
-                if inputObject.KeyCode == Enum.KeyCode.W or inputObject.KeyCode == Enum.KeyCode.S or inputObject.KeyCode == Enum.KeyCode.A or inputObject.KeyCode == Enum.KeyCode.D then
-                    flyVelocity.Velocity = Vector3.new(0, 50, 0)
-                end
-            end
-        end
-
-        game:GetService("UserInputService").InputBegan:Connect(inputBeganFunc)
-        game:GetService("UserInputService").InputEnded:Connect(inputEndedFunc)
+        bv.Velocity = Vector3.zero
     end
-end
 
--- Connect the toggle button to the function
-toggleButton.MouseButton1Click:Connect(toggleFly)
+    bg.CFrame = camera.CFrame
+end)
